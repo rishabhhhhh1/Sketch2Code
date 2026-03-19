@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  /* 🔴 FORCE DARK THEME VARIABLES GLOBALLY */
+  --background: #020617; /* Dark Blue/Black */
+  --foreground: #ffffff; /* Pure White */
+}
+
+/* We removed the @media (prefers-color-scheme) block so it never switches to light mode */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

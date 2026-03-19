@@ -1,0 +1,13 @@
+# Frontend ignores
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+
+# Backend ignores
+backend/venv/
+backend/__pycache__/
+backend/.env
+
+# General Mac/Windows ignores
+.DS_Store
+Thumbs.db
