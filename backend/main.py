@@ -7,27 +7,24 @@ import google.generativeai as genai
 from PIL import Image
 
 # --- KEY SETUP ---
-# Vercel will read this from the Environment Variables you set in the dashboard
 my_api_key = os.getenv("GEMINI_API_KEY") 
 
 if not my_api_key:
-    # Fallback for local testing only if the environment variable isn't set
     my_api_key = "AIzaSyD9S8rh7mG_aZndsMLlAgPRufe5-VPv2UYntend"
 
 genai.configure(api_key=my_api_key)
 
-# Using a standard stable model name for better compatibility
 model_name = 'gemini-1.5-flash' 
 model = genai.GenerativeModel(model_name)
 
 app = FastAPI()
 
-# ✅ UPDATED: Allow your specific Vercel frontend or keep "*" for universal access
+# ✅ FIXED CORS: Credentials must be False when using wildcard "*" origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False, 
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -62,6 +59,7 @@ async def generate_text(request: TextRequest):
         4. Use raw SVGs for icons. Return ONLY raw code, no markdown blocks.
         """
         response = model.generate_content(system_prompt)
+        # Ensure we return plain text from the AI response
         return {"code": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -104,6 +102,3 @@ async def refine_code(request: RefineRequest):
         return {"code": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# --- VERCEL NOTE ---
-# The 'uvicorn.run' block is removed because Vercel uses its own entry point.
