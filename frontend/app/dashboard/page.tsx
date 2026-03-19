@@ -186,7 +186,7 @@ function DashboardContent() {
     setAiInsights(null);
 
     try {
-      let endpoint = mode === "image" ? "http://127.0.0.1:8000/generate/image" : "http://127.0.0.1:8000/generate/text";
+      let endpoint = mode === "image" ? "https://sketch2code-backend.vercel.app/generate/image" : "https://sketch2code-backend.vercel.app/generate/image";
       let body;
       let headers = {};
 
