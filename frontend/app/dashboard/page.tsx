@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useAuth } from "../context/AuthContext"; 
 import { useSearchParams } from "next/navigation"; 
 import { TEMPLATES } from "../../data/templates"; 
@@ -35,7 +35,8 @@ import {
 } from "lucide-react";
 import Link from "next/link"; 
 
-export default function Dashboard() {
+// 1. All original logic moved here
+function DashboardContent() {
   const { user, logOut } = useAuth(); 
   const searchParams = useSearchParams(); 
   
@@ -263,16 +264,11 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ BULLETPROOF REACT PREVIEW RENDERER
   const getPreviewContent = () => {
     if (!iframeCode) return "";
 
-    // Check if it's a React component
     if (iframeCode.includes('export default') || iframeCode.includes('import React')) {
-        
         let cleanCode = iframeCode.replace(/```(jsx|js|tsx|html)?/gi, '');
-        
-        // 1. Find the REAL main component name (what did the AI name the page?)
         let componentName = "App";
         const exportFuncMatch = cleanCode.match(/export\s+default\s+function\s+([a-zA-Z0-9_]+)/);
         const exportDefaultMatch = cleanCode.match(/export\s+default\s+([a-zA-Z0-9_]+)/);
@@ -282,16 +278,11 @@ export default function Dashboard() {
         } else if (exportDefaultMatch && exportDefaultMatch[1]) {
             componentName = exportDefaultMatch[1];
         } else {
-            // If it's literally just "export default function()", rename it to App
             cleanCode = cleanCode.replace(/export\s+default\s+function\s*\(/, 'function App(');
         }
 
-        // 2. Remove imports so browser doesn't crash
-        // 2. Remove imports so browser doesn't crash
-cleanCode = cleanCode.replace(/^import\s+.*?;?$/gm, '');
-cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
-
-        // 3. Strip export keywords so it runs natively in the browser
+        cleanCode = cleanCode.replace(/^import\s+.*?;?$/gm, '');
+        cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
         cleanCode = cleanCode.replace(/export\s+default\s+function/g, 'function');
         cleanCode = cleanCode.replace(/export\s+default\s+[a-zA-Z0-9_]+;?/g, '');
         cleanCode = cleanCode.replace(/export\s+/g, '');
@@ -311,9 +302,7 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                 <script type="text/babel">
                     try {
                         const { useState, useEffect, useRef, useCallback, useMemo } = React;
-                        
                         ${cleanCode}
-                        
                         const root = ReactDOM.createRoot(document.getElementById('root'));
                         if (typeof ${componentName} !== 'undefined') {
                             root.render(React.createElement(${componentName}));
@@ -335,7 +324,6 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
         `;
     }
 
-    // --- STANDARD HTML PREVIEW ---
     if (!isEditMode) return iframeCode; 
 
     const interactiveScript = `
@@ -461,26 +449,18 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
 
   return (
     <div className="flex h-screen w-full bg-[#020617] text-white overflow-hidden font-sans">
-      
-      {/* 1. LEFT SIDEBAR */}
       <aside className="w-80 flex flex-col border-r border-gray-800 bg-[#0f172a] h-full overflow-y-auto overflow-x-hidden">
-        
-        {/* LOGO */}
         <div className="p-5 border-b border-gray-800 flex items-center gap-2">
              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">S2</div>
              <Link href="/" className="font-bold text-lg tracking-tight hover:text-blue-400 transition-colors">Sketch2Code</Link>
         </div>
-
-        {/* INPUT SECTION */}
         <div className="p-5 border-b border-gray-800">
             <h2 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Generator</h2>
-            
             <div className="flex bg-[#020617] p-1 rounded-lg mb-4 border border-gray-700">
                 <button onClick={() => setMode("image")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "image" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>Image</button>
                 <button onClick={() => setMode("text")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "text" ? "bg-purple-600 text-white" : "text-gray-400 hover:text-white"}`}>Text</button>
                 <button onClick={() => setMode("templates")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "templates" ? "bg-emerald-600 text-white" : "text-gray-400 hover:text-white"}`}>Library</button>
             </div>
-
             {mode === "image" && (
                 <div className="relative border-2 border-dashed border-gray-700 rounded-xl p-6 hover:bg-gray-800 transition-colors text-center cursor-pointer group mb-4">
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
@@ -488,11 +468,9 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                     <p className="text-xs text-gray-400 truncate px-2">{selectedImage ? selectedImage.name : "Upload Sketch"}</p>
                 </div>
             )}
-            
             {mode === "text" && (
                 <textarea value={textPrompt} onChange={(e) => setTextPrompt(e.target.value)} placeholder="Describe your UI..." className="w-full h-24 bg-[#020617] border border-gray-700 rounded-xl p-3 text-white text-xs focus:border-purple-500 outline-none mb-4 resize-none" />
             )}
-
             {mode === "templates" && (
                 <div className="flex flex-col gap-2 h-[200px] overflow-y-auto custom-scrollbar pr-1 mb-4">
                     {TEMPLATES.map((t) => (
@@ -503,16 +481,13 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                     ))}
                 </div>
             )}
-
             {mode !== "templates" && (
               <>
                 <select value={framework} onChange={(e) => setFramework(e.target.value)} className="w-full p-2 bg-[#020617] border border-gray-700 rounded-lg text-xs text-white outline-none mb-4">
-    <option value="HTML + Tailwind">HTML + Tailwind</option>
-    
-    <option value="HTML + CSS">HTML + CSS</option>
-    <option value="HTML + JavaScript">HTML + JavaScript</option>
-</select>
-
+                    <option value="HTML + Tailwind">HTML + Tailwind</option>
+                    <option value="HTML + CSS">HTML + CSS</option>
+                    <option value="HTML + JavaScript">HTML + JavaScript</option>
+                </select>
                 <button onClick={generateCode} disabled={loading} className={`w-full py-3 rounded-lg font-bold text-white text-sm transition-all flex items-center justify-center gap-2 ${loading ? 'bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                     {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Code className="w-4 h-4" />}
                     {loading ? "Generating..." : "Generate Code"}
@@ -520,8 +495,6 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
               </>
             )}
         </div>
-
-        {/* AI INSIGHTS */}
         {aiInsights && !selectedElData && (
             <div className="p-5 border-b border-gray-800">
                 <h2 className="text-xs font-bold text-purple-400 flex items-center gap-2 uppercase mb-3"><Lightbulb className="w-3 h-3" /> AI Insights</h2>
@@ -529,8 +502,6 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                 <div className="space-y-2">{aiInsights.tips.map((tip, idx) => (<div key={idx} className="flex gap-2 items-start text-xs text-gray-400"><span className="text-purple-500 mt-0.5">•</span><span>{tip}</span></div>))}</div>
             </div>
         )}
-
-        {/* PROPERTIES PANEL */}
         {selectedElData && (
             <div className="p-5 animate-in fade-in slide-in-from-left-4">
                 <div className="flex items-center justify-between mb-4 border-t border-gray-800 pt-4">
@@ -562,16 +533,12 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                 </div>
             </div>
         )}
-
-        {/* LOG OUT DIV */}
         {!selectedElData && !aiInsights && (
             <div className="p-10 flex flex-col items-center justify-center text-gray-600 text-center h-64 opacity-30">
                 <MousePointer2 className="w-10 h-10 mb-2" />
                 <p className="text-xs">Select an element<br/>to edit properties</p>
             </div>
         )}
-
-        {/* USER PROFILE */}
         {user && (
             <div className="p-4 border-t border-gray-800 bg-[#0a0f1e] mt-auto">
                 <div className="flex items-center gap-3">
@@ -583,10 +550,7 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
         )}
       </aside>
 
-      {/* 2. RIGHT AREA: Editor & Preview */}
       <div className="flex-1 flex flex-col h-full relative bg-[#0a0a0a]">
-        
-        {/* TOP: Code Editor */}
         {iframeCode && (
           <div className={`border-b border-gray-800 bg-[#0f172a] flex flex-col transition-all duration-300 ${isEditorOpen ? 'h-[40%]' : 'h-10'}`}>
               <div className="flex items-center justify-between px-4 py-2 bg-[#020617] border-b border-gray-800">
@@ -604,13 +568,9 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                       </button>
                   </div>
               </div>
-              
-              {/* TEXT AREA AND NEW REFINE CHAT BOX */}
               {isEditorOpen && (
                   <>
                     <textarea className="flex-1 w-full bg-[#0a0a0a] text-gray-300 font-mono text-xs p-4 resize-none focus:outline-none custom-scrollbar" value={generatedCode} onChange={handleManualCodeEdit} spellCheck="false" />
-                    
-                    {/* CHAT TO REFINE INPUT */}
                     <div className="bg-[#020617] border-t border-gray-800 p-2 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-purple-400 ml-2" />
                         <input 
@@ -635,31 +595,21 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
           </div>
         )}
 
-        {/* BOTTOM: Live Preview OR Template Gallery */}
         <div className="flex-1 bg-[#1e293b] relative flex flex-col overflow-hidden items-center justify-center">
-            
             {iframeCode ? (
                 <>
-                  {/* EDIT/PLAY TOGGLES & DEVICE PREVIEW TOGGLES */}
                   <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 backdrop-blur text-white px-2 py-1.5 rounded-full text-[10px] font-bold border border-white/10 shadow-xl z-10">
-                      
-                      {/* Left side: Edit vs Play */}
                       <div className="flex gap-1">
                           <button onClick={() => { setIsEditMode(true); setSelectedElData(null); }} className={`flex items-center gap-1 px-3 py-1 rounded-full transition-all ${isEditMode ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}><Edit3 className="w-3 h-3" /> Edit</button>
                           <button onClick={() => { setIsEditMode(false); setSelectedElData(null); }} className={`flex items-center gap-1 px-3 py-1 rounded-full transition-all ${!isEditMode ? 'bg-green-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}><Play className="w-3 h-3" /> Play</button>
                       </div>
-
                       <div className="w-px h-4 bg-gray-600"></div>
-
-                      {/* Right side: Device Previews */}
                       <div className="flex gap-1 pr-1">
                           <button onClick={() => setDeviceSize("mobile")} className={`p-1.5 rounded-full transition-colors ${deviceSize === "mobile" ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`} title="Mobile View"><Smartphone className="w-4 h-4" /></button>
                           <button onClick={() => setDeviceSize("tablet")} className={`p-1.5 rounded-full transition-colors ${deviceSize === "tablet" ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`} title="Tablet View"><Tablet className="w-4 h-4" /></button>
                           <button onClick={() => setDeviceSize("desktop")} className={`p-1.5 rounded-full transition-colors ${deviceSize === "desktop" ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`} title="Desktop View"><Monitor className="w-4 h-4" /></button>
                       </div>
                   </div>
-
-                  {/* IFRAME CONTAINER WRAPPER FOR RESPONSIVE WIDTH */}
                   <div className={`transition-all duration-500 ease-in-out h-full mt-14 bg-white shadow-2xl border-x border-t border-gray-400/20 overflow-hidden
                       ${deviceSize === "desktop" ? "w-full" : ""}
                       ${deviceSize === "tablet" ? "w-[768px]" : ""}
@@ -675,7 +625,6 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
                             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Template Gallery</h2>
                             <p className="text-slate-400 text-sm">Upload a sketch on the left, or click a template below to start editing immediately.</p>
                         </div>
-                        
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                             {TEMPLATES.map((t) => (
                                 <div key={t.id} onClick={() => loadTemplate(t.code)} className="group rounded-2xl overflow-hidden border border-white/5 bg-[#0a0f1e] hover:border-blue-500/50 transition-all cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(37,99,235,0.15)] flex flex-col h-[300px]">
@@ -700,5 +649,18 @@ cleanCode = cleanCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
         </div>
       </div>
     </div>
+  );
+}
+
+// 2. Main export with Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen bg-[#020617]">
+            <Loader2 className="animate-spin text-blue-500 w-10 h-10" />
+        </div>
+    }>
+        <DashboardContent />
+    </Suspense>
   );
 }
