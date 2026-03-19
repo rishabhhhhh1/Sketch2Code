@@ -1,22 +1,28 @@
 import os
+import io
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel 
-import uvicorn
 import google.generativeai as genai
 from PIL import Image
-import io
 
 # --- KEY SETUP ---
-my_api_key = "AIzaSyD9S8rh7mG_aZndsMLlAgPRufe5-VPv2UY" 
+# Vercel will read this from the Environment Variables you set in the dashboard
+my_api_key = os.getenv("GEMINI_API_KEY") 
+
+if not my_api_key:
+    # Fallback for local testing only if the environment variable isn't set
+    my_api_key = "AIzaSyD9S8rh7mG_aZndsMLlAgPRufe5-VPv2UYntend"
 
 genai.configure(api_key=my_api_key)
 
-model_name = 'gemini-2.5-flash' 
+# Using a standard stable model name for better compatibility
+model_name = 'gemini-1.5-flash' 
 model = genai.GenerativeModel(model_name)
 
 app = FastAPI()
 
+# ✅ UPDATED: Allow your specific Vercel frontend or keep "*" for universal access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -30,29 +36,19 @@ class TextRequest(BaseModel):
     prompt: str
     framework: str
 
-# ✅ NEW: Model for the "Chat to Refine" feature
 class RefineRequest(BaseModel):
     original_code: str
     prompt: str
     framework: str
 
-@app.on_event("startup")
-async def startup_event():
-    print("------------------------------------------------")
-    print(f"🚀 Connecting to AI Model: {model_name}")
-    print("------------------------------------------------")
-
 @app.get("/")
 def read_root():
-    return {"message": "Sketch2Code Backend is Running!"}
+    return {"status": "online", "message": "Sketch2Code Backend is Running!"}
 
 # --- 1. GENERATE FROM TEXT ---
 @app.post("/generate/text")
 async def generate_text(request: TextRequest):
     try:
-        print(f"📝 Processing Text Request: {request.prompt[:50]}...")
-        
-        # ✅ FIX: Smarter prompt that handles React vs HTML
         system_prompt = f"""
         You are an expert web developer.
         Task: Generate pixel-perfect code based on this description.
@@ -62,16 +58,12 @@ async def generate_text(request: TextRequest):
         RULES:
         1. Create a COMPLETE single file solution.
         2. IF Framework contains 'HTML': Include <script src="https://cdn.tailwindcss.com"></script>.
-        3. IF Framework contains 'React' or 'Next.js': Return a functional React component (e.g., `export default function Component() {{ ... }}`). Do NOT use HTML boilerplate. Use raw SVGs for icons.
-        4. Use placeholder images (https://placehold.co/600x400) where needed.
-        5. Return ONLY the raw code. No markdown blocks (like ```html).
+        3. IF Framework contains 'React' or 'Next.js': Return a functional React component.
+        4. Use raw SVGs for icons. Return ONLY raw code, no markdown blocks.
         """
-        
         response = model.generate_content(system_prompt)
         return {"code": response.text}
-
     except Exception as e:
-        print(f"❌ TEXT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- 2. GENERATE FROM IMAGE ---
@@ -81,58 +73,37 @@ async def generate_image(
     framework: str = Form(...) 
 ):
     try:
-        print(f"🖼️ Processing Image Request: {file.filename}")
         contents = await file.read()
         image_part = Image.open(io.BytesIO(contents))
         
-        # ✅ FIX: Smarter prompt that handles React vs HTML
         prompt = f"""
-        You are an expert web developer. 
-        Analyze this UI image and generate the code for: {framework}.
-
+        Analyze this UI image and generate code for: {framework}.
         RULES:
-        1. Create a COMPLETE single file solution.
-        2. IF Framework contains 'HTML': Include <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>.
-        3. IF Framework contains 'React' or 'Next.js': Return a functional React component (e.g., `export default function Component() {{ ... }}`). Do NOT use HTML boilerplate. Use raw SVGs for icons.
-        4. Return ONLY the raw code. No markdown blocks.
+        1. COMPLETE single file solution.
+        2. IF HTML: Include Tailwind CDN.
+        3. IF React: Functional component, no HTML boilerplate.
+        4. Return ONLY raw code.
         """
-        
         response = model.generate_content([prompt, image_part])
         return {"code": response.text}
     except Exception as e:
-        print(f"❌ IMAGE ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# --- 3. NEW: CHAT TO REFINE FEATURE ---
+# --- 3. CHAT TO REFINE ---
 @app.post("/generate/refine")
 async def refine_code(request: RefineRequest):
     try:
-        print(f"🔄 Processing Refine Request: {request.prompt[:50]}...")
-        
         system_prompt = f"""
-        You are an expert web developer.
-        I will provide you with existing code and a request to modify it.
+        Modify the existing code based on the request.
         Target Framework: {request.framework}
-
-        Modification Request: "{request.prompt}"
-
-        Existing Code:
-        {request.original_code}
-
-        RULES:
-        1. Apply the requested modification to the existing code perfectly.
-        2. Return the COMPLETE updated code (do not just return the snippet that changed).
-        3. Do NOT wrap the code in markdown blocks (like ```html). Return ONLY the raw code.
+        Modification: "{request.prompt}"
+        Existing Code: {request.original_code}
+        Return COMPLETE updated code. No markdown.
         """
-        
         response = model.generate_content(system_prompt)
         return {"code": response.text}
-
     except Exception as e:
-        print(f"❌ REFINE ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+# --- VERCEL NOTE ---
+# The 'uvicorn.run' block is removed because Vercel uses its own entry point.
