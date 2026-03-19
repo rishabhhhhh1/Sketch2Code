@@ -186,7 +186,11 @@ function DashboardContent() {
     setAiInsights(null);
 
     try {
-      let endpoint = mode === "image" ? "https://sketch2code-backend.vercel.app/generate/image" : "https://sketch2code-backend.vercel.app/generate/image";
+      // ✅ CHANGED: Updated to your live Vercel backend URL
+      let endpoint = mode === "image" 
+        ? "https://sketch2code-backend.vercel.app/generate/image" 
+        : "https://sketch2code-backend.vercel.app/generate/text";
+      
       let body;
       let headers = {};
 
@@ -237,7 +241,8 @@ function DashboardContent() {
     
     setIsRefining(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/generate/refine", {
+      // ✅ CHANGED: Updated to your live Vercel backend URL
+      const response = await fetch("https://sketch2code-backend.vercel.app/generate/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
